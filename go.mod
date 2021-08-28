@@ -1,4 +1,4 @@
-module github.com/Baraha/stream_server.git
+module github.com/Baraha/csv_converter.git
 
 go 1.16
 

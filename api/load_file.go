@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"database/sql"
 	"fmt"
 	"log"
 	"strings"
@@ -19,8 +20,12 @@ func LoadFile(ctx *fasthttp.RequestCtx) {
 	}
 	fmt.Println("file", file)
 
-	s := strings.Split(file.Filename, ".")
-	fmt.Println("file.Filename", file.Filename, "and file name", s[0])
+	name := strings.Split(file.Filename, ".")
+	if name[1] != "csv" {
+		ctx.Response.AppendBodyString("error : file is not csv type")
+		return
+	}
+	fmt.Println("file.Filename", file.Filename, "and file name", name[0])
 
 	readFile, err := file.Open()
 	if err != nil {
@@ -30,7 +35,7 @@ func LoadFile(ctx *fasthttp.RequestCtx) {
 
 	scanner := bufio.NewScanner(readFile)
 	var headers map[int]string
-	headers = make(map[int]string)
+	headersType := make(map[string]string)
 	var data = map[int]map[int]string{}
 	cnt := 0
 	separator := ","
@@ -38,7 +43,6 @@ func LoadFile(ctx *fasthttp.RequestCtx) {
 	for scanner.Scan() {
 		s := scanner.Text()
 
-		s = strings.ReplaceAll(s, " ", "")
 		switch {
 		case firstIter == true && strings.Contains(s, ";"):
 			separator = ";"
@@ -53,7 +57,7 @@ func LoadFile(ctx *fasthttp.RequestCtx) {
 		if strings.Contains(s, `"`) && firstIter == true {
 
 			for index, value := range strings.Split(s, separator) {
-
+				value = strings.ReplaceAll(value, `"`, "")
 				headers[index] = value
 				fmt.Println("header data headers[index]", headers[index])
 			}
@@ -75,32 +79,30 @@ func LoadFile(ctx *fasthttp.RequestCtx) {
 
 	}
 
-	fmt.Println("END PROCESS : headers", headers, "lines", data)
+	fmt.Println("END PROCESS CONVERTING : headers", headers, "lines", data)
+	strcreate := ""
+	for key, value := range headersType {
+		strcreate += key + " " + value + "\n"
 
-	// lines, err := csv.NewReader(readFile).ReadAll()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// 	return
-	// }
-
-	// var (
-	// 	ddl = fmt.Sprintf(`
-	// 		CREATE TABLE %s (
-	// 			salary   INT
-
-	// 		) Engine=Memory
-	// 	`, s[0])
+	}
+	fmt.Println(strcreate)
+	var (
+		ddl = fmt.Sprintf(`
+			CREATE TABLE %s (`+"\n"+``+strcreate+`) Engine=Memory
+		`, name[0])
+	)
 
 	// 	dds = fmt.Sprintf(`INSERT INTO %s (salary) VAlUES (?)`, s[0])
 	// )
-	// connect, err := sql.Open("clickhouse", "tcp://127.0.0.1:9000?debug=true")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// _, err2 := connect.Exec(ddl)
-	// if err2 != nil {
-	// 	log.Fatal(err2)
-	// }
+	connect, err := sql.Open("clickhouse", "tcp://127.0.0.1:9000?debug=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err2 := connect.Exec(ddl)
+	if err2 != nil {
+		log.Fatal(err2)
+	}
+	// Не успел закончить!!!
 	// tx, _ := connect.Begin()
 	// _, err3 := tx.Exec(dds, 100)
 	// if err3 != nil {
